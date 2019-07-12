@@ -1,0 +1,5 @@
+game.createClass('', {
+    init: function() {
+        
+    }
+});

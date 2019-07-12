@@ -1,0 +1,8 @@
+game.module(
+    'game.player'
+)
+.body(function() {
+
+
+
+});
