@@ -8,11 +8,17 @@ game.createScene('Main', {
     track: null,
 
     init: function() {
+        var container = new game.Container();
+        container.addTo(this.stage);
         this.track = new game.TrackSegment();
+        this.track.addTo(container);
         pilot = new game.Pilot(this.track);
-        
-        for(i = 0; i < 100; i++ ) 
+
+        for(i = 0; i < 500; i++ ) 
             this.track = new game.TrackSegment(this.track);
+            
+        camera = new game.GameCamera(container, this.stage);
+        camera.pilot = pilot;
     },
     
     mousemove: function(x, y) {
@@ -33,16 +39,54 @@ game.createScene('Main', {
     }
     
 });
+game.createClass('GameCamera', {
+    radius: 40,
+    cameraSpeed: 200,
+    toggleFollow: false,
+    shape: null,
+    pilot:null,
+    init: function(container, stage) {
+        this.shape = new game.Graphics();
+        this.shape.lineWidth = 2;
+        this.shape.lineColor = 'red';
+        this.shape.fillColor = null;
+        var offset = this.radius/2;
+        this.shape.drawCircle(0, 0, this.radius);
+        this.shape.drawLine(-this.radius -offset, 0,  -offset , 0);
+        this.shape.drawLine(offset + this.radius, 0, offset , 0);
+        this.shape.drawLine(0, -this.radius -offset, 0, -offset);
+        this.shape.drawLine(0, this.radius +offset, 0, offset);
+        this.shape.anchorCenter();
+        this.shape.center(stage);
+        this.shape.addTo(container);
 
-game.createClass('Pilot', {
-    trackSegment: null,
+        var camera = new game.Camera(this.shape);
+        camera.addTo(container);
+    },
     
+    update: function() {
+        if (game.keyboard.down('SPACE')) this.toggleFollow = !this.toggleFollow; 
+        
+        if(this.toggleFollow && this.pilot) {
+            this.shape.x = pilot.shape.x + this.radius;
+            this.shape.y = pilot.shape.y + this.radius;
+            return;
+        }
+
+        if (game.keyboard.down('LEFT')) this.shape.x -= this.cameraSpeed * game.delta;
+        if (game.keyboard.down('RIGHT')) this.shape.x += this.cameraSpeed * game.delta;
+        if (game.keyboard.down('UP')) this.shape.y -= this.cameraSpeed * game.delta;
+        if (game.keyboard.down('DOWN')) this.shape.y += this.cameraSpeed * game.delta;
+        
+    },
+});
+game.createClass('Pilot', {
+    shape: null,
     init: function(trackSegment) {
-        this.trackSegment = trackSegment;
-        var grap = this.grap;
-        grap = new game.Graphics();
-        grap.drawCircle(0, 0, 5);
-        grap.addTo(game.scene.stage);
+        this.shape = new game.Graphics();
+        this.shape.drawCircle(0, 0, 5);
+        this.shape.addTo(game.scene.stage);
+        this.shape.addTo(trackSegment.container);
         
         var props = {
             percent: 1 
@@ -60,19 +104,41 @@ game.createClass('Pilot', {
             }
         };
 
-        var tween = game.Tween.add(grap, props, 500, settings);
+        var tween = game.Tween.add(this.shape, props, 500, settings);
         tween.start();
     }
 });
 
 
 game.createClass('TrackSegment', {
+    length: 20,
+    curvature: Math.PI,
+    turnAngle: Math.PI/2,
     curve: null,
     prevSegment: null,
     nextSegment: null,
-    length: 20,
-    curvature: Math.PI / 2,
-    turnAngle: Math.PI /2,
+    container: null,
+    grap: null,
+    
+    init: function(prevSegment) {
+        if(prevSegment == null) {
+            this.curve = this.startCurve();   
+        } else {
+            this.curve = this.continuingCurve(prevSegment);
+        }
+        this.grap = new game.Graphics();
+        this.grap.lineWidth = 2;
+        this.grap.drawCurve(this.curve);
+        this.grap.addTo(game.scene.stage);
+        if(this.container)
+            this.grap.addTo(this.container);
+            
+    },
+    
+    addTo: function(container) {
+        this.container = container;
+        this.grap.addTo(container);
+    },
     
     startCurve: function() {
         length = this.length;
@@ -86,6 +152,7 @@ game.createClass('TrackSegment', {
     },
     
     continuingCurve: function(prevSegment) {
+        this.container = prevSegment.container;
         var length = this.length;
         var direction = (prevSegment.curve.start.angle(prevSegment.curve.end) - this.turnAngle / 2) + (Math.random() * this.turnAngle);
         var head = prevSegment.curve.end.clone();
@@ -109,18 +176,6 @@ game.createClass('TrackSegment', {
         var control2Handle = new game.Handle(curve.handle2, 'blue', 0.5);
         prevSegment.nextSegment = this;
         return curve;
-    },
-    
-    init: function(prevSegment) {
-        if(prevSegment == null) {
-            this.curve = this.startCurve();   
-        } else {
-            this.curve = this.continuingCurve(prevSegment);
-        }
-        this.grap = new game.Graphics();
-        this.grap.lineWidth = 2;
-        this.grap.drawCurve(this.curve);
-        this.grap.addTo(game.scene.stage);
     }
 });
 
