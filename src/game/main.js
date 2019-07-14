@@ -13,51 +13,36 @@ game.createScene('Main', {
         this.track = new game.TrackSegment();
         this.track.addTo(container);
         pilot = new game.Pilot(this.track);
-
-        for(i = 0; i < 500; i++ ) 
+        
+        for(i = 0; i < 50; i++ ) 
             this.track = new game.TrackSegment(this.track);
             
-        camera = new game.GameCamera(container, this.stage);
-        camera.pilot = pilot;
-    },
-    
-    mousemove: function(x, y) {
-        if (!this.activeHandle) return;
-        
-        this.activeHandle.grap.position.set(x, y);
-        this.activeHandle.target.set(x, y);
-    },
-    
-    mouseup: function() {
-        this.activeHandle = null;
-    },
-    
-    mousedown: function() {
-        var i;
-        for(i = 0; i < 10; i++ ) 
-            this.track = new game.TrackSegment(this.track);
+        camera = new game.GameCamera(container, pilot);
     }
     
 });
+
 game.createClass('GameCamera', {
     radius: 40,
-    cameraSpeed: 200,
-    toggleFollow: false,
+    cameraSpeed: 400,
+    toggleFollow: true,
     shape: null,
     pilot:null,
-    init: function(container, stage) {
+    container: null,
+    init: function(container, pilot) {
+        this.pilot = pilot;
+        this.container = container;
+        var offset = this.radius/2;
         this.shape = new game.Graphics();
         this.shape.lineWidth = 2;
         this.shape.lineColor = 'red';
         this.shape.fillColor = null;
-        var offset = this.radius/2;
         this.shape.drawCircle(0, 0, this.radius);
         this.shape.drawLine(-this.radius -offset, 0,  -offset , 0);
         this.shape.drawLine(offset + this.radius, 0, offset , 0);
         this.shape.drawLine(0, -this.radius -offset, 0, -offset);
         this.shape.drawLine(0, this.radius +offset, 0, offset);
         this.shape.anchorCenter();
-        this.shape.center(stage);
         this.shape.addTo(container);
 
         var camera = new game.Camera(this.shape);
@@ -68,8 +53,7 @@ game.createClass('GameCamera', {
         if (game.keyboard.down('SPACE')) this.toggleFollow = !this.toggleFollow; 
         
         if(this.toggleFollow && this.pilot) {
-            this.shape.x = pilot.shape.x + this.radius;
-            this.shape.y = pilot.shape.y + this.radius;
+            this.shape.position.set(pilot.shape.x + this.radius, pilot.shape.y + this.radius);
             return;
         }
 
@@ -81,13 +65,21 @@ game.createClass('GameCamera', {
     },
 });
 game.createClass('Pilot', {
+    speed: 50,
     shape: null,
+    clearing: 30,
+
     init: function(trackSegment) {
+        tail = trackSegment;
+        head = trackSegment;
+        clearing = this.clearing;
         this.shape = new game.Graphics();
         this.shape.drawCircle(0, 0, 5);
+        this.shape.color = 'green';
         this.shape.addTo(game.scene.stage);
         this.shape.addTo(trackSegment.container);
         
+        shape = this.shape;
         var props = {
             percent: 1 
         };
@@ -100,11 +92,31 @@ game.createClass('Pilot', {
                 trackSegment.curve.point(this.percent, this.position);
             },
             onRepeat: function() {
-                trackSegment = trackSegment.nextSegment;
+                if(trackSegment.nextSegment){
+                    trackSegment = trackSegment.nextSegment;
+                    shape.swap(trackSegment.grap);
+                }
+    
+                while(shape.position.distance(tail.curve.end) > clearing*tail.length) {
+                    var disposed = tail;
+                    tail = tail.nextSegment;
+                    disposed.remove();
+                }
+                
+                while(head.nextSegment)
+                    head = head.nextSegment;
+                
+                while(shape.position.distance(head.curve.end) < clearing*head.length) {
+                    head.addSegment();
+                    head = head.nextSegment;
+                }
+                
+                
+                
             }
         };
 
-        var tween = game.Tween.add(this.shape, props, 500, settings);
+        var tween = game.Tween.add(this.shape, props, this.speed, settings);
         tween.start();
     }
 });
@@ -128,11 +140,23 @@ game.createClass('TrackSegment', {
         }
         this.grap = new game.Graphics();
         this.grap.lineWidth = 2;
-        this.grap.drawCurve(this.curve);
+        this.grap.lineColor = 'blue';
         this.grap.addTo(game.scene.stage);
+        this.grap.drawCurve(this.curve);
+        
         if(this.container)
             this.grap.addTo(this.container);
-            
+    },
+    
+    remove: function() {
+        this.grap.remove();
+    },
+    
+    addSegment: function() {
+        var segment = this;
+        while(segment.nextSegment)
+            segment = segment.nextSegment;
+        segment.nextSegment = new game.TrackSegment(segment);
     },
     
     addTo: function(container) {
@@ -170,37 +194,9 @@ game.createClass('TrackSegment', {
         var curve = new game.Curve(prevSegment.curve.end.x, prevSegment.curve.end.y, head.x, head.y, 
         startHandle.x, startHandle.y, controlHandle.x, controlHandle.y);
         
-        var startHandle = new game.Handle(curve.start, 'red');
-        var controlHandle = new game.Handle(curve.handle1, 'red', 0.5);
-        var endHandle = new game.Handle(curve.end, 'blue');
-        var control2Handle = new game.Handle(curve.handle2, 'blue', 0.5);
         prevSegment.nextSegment = this;
         return curve;
     }
 });
-
-game.createClass('Handle', {
-    init: function(target, color, alpha) {
-        if(false)
-        {
-            this.target = target;
-            this.grap = new game.Graphics();
-            this.grap.position.copy(target);
-            this.grap.fillColor = color;
-            this.grap.drawCircle(5, 5, 5);
-            this.grap.alpha = alpha || 1;
-            this.grap.anchorCenter();
-            this.grap.interactive = true;
-            this.grap.mousedown = this.mousedown.bind(this);
-            this.grap.addTo(game.scene.stage);
-        }
-
-    },
-    
-    mousedown: function() {
-        game.scene.activeHandle = this;
-    }
-});
-
 
 });
