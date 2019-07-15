@@ -2,21 +2,20 @@ game.module(
     'game.main'
 )
 .body(function() {
-    
 
 game.createScene('Main', {
     track: null,
 
     init: function() {
+        var bg = new game.Graphics();
+        bg.drawRect(0, 0, game.width, game.height);
+        bg.addTo(this.stage);
+        
         var container = new game.Container();
         container.addTo(this.stage);
-        this.track = new game.TrackSegment();
-        this.track.addTo(container);
+        this.track = new game.TrackSegment(container);
+        this.track.addSegment();
         pilot = new game.Pilot(this.track);
-        
-        for(i = 0; i < 50; i++ ) 
-            this.track = new game.TrackSegment(this.track);
-            
         camera = new game.GameCamera(container, pilot);
     }
     
@@ -65,21 +64,23 @@ game.createClass('GameCamera', {
     },
 });
 game.createClass('Pilot', {
-    speed: 50,
+    speed: 2000,
     shape: null,
+    size: 20,
     clearing: 30,
 
     init: function(trackSegment) {
         tail = trackSegment;
         head = trackSegment;
-        clearing = this.clearing;
         this.shape = new game.Graphics();
-        this.shape.drawCircle(0, 0, 5);
-        this.shape.color = 'green';
+        this.shape.fillColor = 'green';
+        this.shape.drawPolygon([-this.size, this.size, 0, 0, this.size, this.size, -this.size, this.size]);
         this.shape.addTo(game.scene.stage);
         this.shape.addTo(trackSegment.container);
         
         shape = this.shape;
+        clearing = this.clearing;
+        prevPoint = trackSegment.curve.start;
         var props = {
             percent: 1 
         };
@@ -89,12 +90,15 @@ game.createClass('Pilot', {
             yoyo: false,
             easing: 'Linear.None',
             onUpdate: function() {
+                var prevPoint = new game.Vector(this.position.x, this.position.y);
                 trackSegment.curve.point(this.percent, this.position);
+                shape.rotation = prevPoint.angle(this.position) + Math.PI/2;
             },
             onRepeat: function() {
                 if(trackSegment.nextSegment){
                     trackSegment = trackSegment.nextSegment;
                     shape.swap(trackSegment.grap);
+                    
                 }
     
                 while(shape.position.distance(tail.curve.end) > clearing*tail.length) {
@@ -123,45 +127,53 @@ game.createClass('Pilot', {
 
 
 game.createClass('TrackSegment', {
-    length: 20,
-    curvature: Math.PI,
+    length: 800,
+    width: 200,
+    curvature: Math.PI/2,
     turnAngle: Math.PI/2,
     curve: null,
     prevSegment: null,
     nextSegment: null,
     container: null,
     grap: null,
+    sprite: null,
     
-    init: function(prevSegment) {
+    init: function(container, prevSegment) {
+        this.container = container;
         if(prevSegment == null) {
             this.curve = this.startCurve();   
         } else {
             this.curve = this.continuingCurve(prevSegment);
         }
         this.grap = new game.Graphics();
-        this.grap.lineWidth = 2;
+        this.grap.lineWidth = this.width;
         this.grap.lineColor = 'blue';
         this.grap.addTo(game.scene.stage);
         this.grap.drawCurve(this.curve);
-        
-        if(this.container)
-            this.grap.addTo(this.container);
+        this.grap.lineWidth = this.width * 0.9;
+        this.grap.lineColor = 'white';
+        this.grap.drawCurve(this.curve);
+        this.grap.addTo(this.container);
     },
     
     remove: function() {
-        this.grap.remove();
+        if(this.grap)
+            this.grap.remove();
+        if(this.sprite)
+            this.sprite.remove();
     },
     
     addSegment: function() {
         var segment = this;
         while(segment.nextSegment)
             segment = segment.nextSegment;
-        segment.nextSegment = new game.TrackSegment(segment);
+        segment.nextSegment = new game.TrackSegment(this.container, segment);
     },
     
     addTo: function(container) {
         this.container = container;
         this.grap.addTo(container);
+        this.sprite.addTo(container);   
     },
     
     startCurve: function() {
