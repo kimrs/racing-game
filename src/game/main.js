@@ -5,18 +5,29 @@ game.module(
 
 game.createScene('Main', {
     track: null,
+    camera: null,
 
     init: function() {
+        game.Debug = true;
         var bg = new game.Graphics();
-        bg.drawRect(0, 0, game.width, game.height);
+        bg.drawRect(0, 0, game.width, game.height - 100);
         bg.addTo(this.stage);
         
         var container = new game.Container();
         container.addTo(this.stage);
-        this.track = new game.TrackSegment(container);
+        
+        var bgContainer = new game.Container();
+        bgContainer.addTo(container);
+        this.track = new game.TrackSegment(bgContainer);
         this.track.addSegment();
         pilot = new game.Pilot(this.track);
-        camera = new game.GameCamera(container, pilot);
+        pilot.shape.swap(this.track.nextSegment.shape);
+        
+        var uiContainer = new game.Container();
+        bgContainer.addChild(uiContainer);
+        //uiContainer.addTo(bgContainer);
+        
+        this.camera = new game.GameCamera(uiContainer, pilot);
     }
     
 });
@@ -24,10 +35,12 @@ game.createScene('Main', {
 game.createClass('GameCamera', {
     radius: 40,
     cameraSpeed: 400,
-    toggleFollow: true,
+    toggleFollow: false,
     shape: null,
     pilot:null,
     container: null,
+    camera: null,
+    cameraDrawOrder: 3,
     init: function(container, pilot) {
         this.pilot = pilot;
         this.container = container;
@@ -44,11 +57,16 @@ game.createClass('GameCamera', {
         this.shape.anchorCenter();
         this.shape.addTo(container);
 
-        var camera = new game.Camera(this.shape);
-        camera.addTo(container);
+        this.camera = new game.Camera(this.shape);
+        
+        this.camera.addTo(container);
     },
     
     update: function() {
+        
+        var pilotShapePosition =  this.pilot.shape.position;
+        
+        game.Debug.Text = "campos: " + this.camera;
         if (game.keyboard.down('SPACE')) this.toggleFollow = !this.toggleFollow; 
         
         if(this.toggleFollow && this.pilot) {
@@ -60,7 +78,7 @@ game.createClass('GameCamera', {
         if (game.keyboard.down('RIGHT')) this.shape.x += this.cameraSpeed * game.delta;
         if (game.keyboard.down('UP')) this.shape.y -= this.cameraSpeed * game.delta;
         if (game.keyboard.down('DOWN')) this.shape.y += this.cameraSpeed * game.delta;
-        
+
     },
 });
 game.createClass('Pilot', {
@@ -97,7 +115,7 @@ game.createClass('Pilot', {
             onRepeat: function() {
                 if(trackSegment.nextSegment){
                     trackSegment = trackSegment.nextSegment;
-                    shape.swap(trackSegment.grap);
+                    shape.swap(trackSegment.shape);
                     
                 }
     
@@ -114,9 +132,6 @@ game.createClass('Pilot', {
                     head.addSegment();
                     head = head.nextSegment;
                 }
-                
-                
-                
             }
         };
 
@@ -135,7 +150,7 @@ game.createClass('TrackSegment', {
     prevSegment: null,
     nextSegment: null,
     container: null,
-    grap: null,
+    shape: null,
     sprite: null,
     
     init: function(container, prevSegment) {
@@ -145,20 +160,20 @@ game.createClass('TrackSegment', {
         } else {
             this.curve = this.continuingCurve(prevSegment);
         }
-        this.grap = new game.Graphics();
-        this.grap.lineWidth = this.width;
-        this.grap.lineColor = 'blue';
-        this.grap.addTo(game.scene.stage);
-        this.grap.drawCurve(this.curve);
-        this.grap.lineWidth = this.width * 0.9;
-        this.grap.lineColor = 'white';
-        this.grap.drawCurve(this.curve);
-        this.grap.addTo(this.container);
+        this.shape = new game.Graphics();
+        this.shape.lineWidth = this.width;
+        this.shape.lineColor = 'blue';
+        this.shape.addTo(game.scene.stage);
+        this.shape.drawCurve(this.curve);
+        this.shape.lineWidth = this.width * 0.9;
+        this.shape.lineColor = 'white';
+        this.shape.drawCurve(this.curve);
+        this.shape.addTo(this.container);
     },
     
     remove: function() {
-        if(this.grap)
-            this.grap.remove();
+        if(this.shape)
+            this.shape.remove();
         if(this.sprite)
             this.sprite.remove();
     },
@@ -172,7 +187,7 @@ game.createClass('TrackSegment', {
     
     addTo: function(container) {
         this.container = container;
-        this.grap.addTo(container);
+        this.shape.addTo(container);
         this.sprite.addTo(container);   
     },
     
