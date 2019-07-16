@@ -4,13 +4,10 @@ game.module(
 .body(function() {
 
 game.createScene('Main', {
-    track: null,
-    camera: null,
-
+    
     init: function() {
-        game.Debug = true;
         var bg = new game.Graphics();
-        bg.drawRect(0, 0, game.width, game.height - 100);
+        bg.drawRect(0, 0, game.width, game.height);
         bg.addTo(this.stage);
         
         var container = new game.Container();
@@ -18,16 +15,12 @@ game.createScene('Main', {
         
         var bgContainer = new game.Container();
         bgContainer.addTo(container);
-        this.track = new game.TrackSegment(bgContainer);
-        this.track.addSegment();
-        pilot = new game.Pilot(this.track);
-        pilot.shape.swap(this.track.nextSegment.shape);
+        track = new game.TrackSegment(bgContainer);
+        track.addSegment();
+        pilot = new game.Pilot(track);
+        pilot.shape.swap(track.nextSegment.shape);
         
-        var uiContainer = new game.Container();
-        bgContainer.addChild(uiContainer);
-        //uiContainer.addTo(bgContainer);
-        
-        this.camera = new game.GameCamera(uiContainer, pilot);
+        camera = new game.GameCamera(container, pilot);
     }
     
 });
@@ -35,12 +28,11 @@ game.createScene('Main', {
 game.createClass('GameCamera', {
     radius: 40,
     cameraSpeed: 400,
-    toggleFollow: false,
+    toggleFollow: true,
     shape: null,
     pilot:null,
     container: null,
     camera: null,
-    cameraDrawOrder: 3,
     init: function(container, pilot) {
         this.pilot = pilot;
         this.container = container;
@@ -63,10 +55,6 @@ game.createClass('GameCamera', {
     },
     
     update: function() {
-        
-        var pilotShapePosition =  this.pilot.shape.position;
-        
-        game.Debug.Text = "campos: " + this.camera;
         if (game.keyboard.down('SPACE')) this.toggleFollow = !this.toggleFollow; 
         
         if(this.toggleFollow && this.pilot) {
@@ -116,7 +104,6 @@ game.createClass('Pilot', {
                 if(trackSegment.nextSegment){
                     trackSegment = trackSegment.nextSegment;
                     shape.swap(trackSegment.shape);
-                    
                 }
     
                 while(shape.position.distance(tail.curve.end) > clearing*tail.length) {
@@ -151,7 +138,6 @@ game.createClass('TrackSegment', {
     nextSegment: null,
     container: null,
     shape: null,
-    sprite: null,
     
     init: function(container, prevSegment) {
         this.container = container;
@@ -172,10 +158,7 @@ game.createClass('TrackSegment', {
     },
     
     remove: function() {
-        if(this.shape)
-            this.shape.remove();
-        if(this.sprite)
-            this.sprite.remove();
+        this.shape.remove();
     },
     
     addSegment: function() {
