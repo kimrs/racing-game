@@ -4,7 +4,8 @@ game.module(
 .body(function() {
 
 game.createScene('Main', {
-    
+    car: null,
+    pilot: null,
     init: function() {
         var bg = new game.Graphics();
         bg.drawRect(0, 0, game.width, game.height);
@@ -17,11 +18,21 @@ game.createScene('Main', {
         bgContainer.addTo(container);
         track = new game.TrackSegment(bgContainer);
         track.addSegment();
-        pilot = new game.Pilot(track);
-        car = new game.Car(pilot);
-        pilot.shape.swap(track.nextSegment.shape);
+        this.pilot = new game.Pilot(track);
+        this.car = new game.Car(this.pilot);
+        this.pilot.shape.swap(track.nextSegment.shape);
         
-        camera = new game.GameCamera(container, car.shape.parent);
+        camera = new game.GameCamera(container, this.car.shape);
+    },
+    update: function() {
+        if(game.keyboard.down('A')) {
+            this.pilot.tween.pause();
+            camera.target = this.car.shape;
+        }
+        if(game.keyboard.down('B')) {
+            this.pilot.tween.resume();
+            camera.target = this.car.shape.parent;
+        }
     }
 });
 
@@ -48,14 +59,20 @@ game.createClass('GameCamera', {
         this.shape.addTo(container);
 
         this.camera = new game.Camera(this.shape);
+        this.camera.maxSpeed = this.cameraSpeed;
         this.camera.addTo(container);
     },
-    
+
     update: function() {
         if (game.keyboard.down('SPACE')) this.toggleFollow = !this.toggleFollow; 
         
         if(this.toggleFollow && this.target) {
-            this.shape.position.set(this.target.x + this.radius, this.target.y + this.radius);
+            hyp = this.target.y;
+            angle = this.target.parent.rotation;
+            pos = new game.Vector(  -hyp * Math.sin(angle) + this.target.parent.x,
+                                     hyp * Math.cos(angle) + this.target.parent.y);
+            
+            this.shape.position.set(pos.x + this.radius, pos.y + this.radius);
             return;
         }
 
@@ -79,13 +96,20 @@ game.createClass('Car', {
         this.shape.drawPolygon([-this.size, this.size*2, -this.size, this.size, 0, 0, this.size, this.size, this.size, this.size*2, -this.size, this.size*2]);
         pilot.shape.addChild(this.shape);
     },
+    update: function() {
+        if (game.keyboard.down('UP')) this.shape.y -= 400 * game.delta;
+        if (game.keyboard.down('DOWN')) this.shape.y += 400 * game.delta;
+        
+    }
 });
 
 game.createClass('Pilot', {
     speed: 2000,
     shape: null,
+    tween: null,
     size: 20,
     clearing: 30,
+    moving: true,
 
     init: function(trackSegment) {
         tail = trackSegment;
@@ -95,20 +119,24 @@ game.createClass('Pilot', {
         this.shape.drawPolygon([-this.size, this.size, 0, 0, this.size, this.size, -this.size, this.size]);
         this.shape.addTo(trackSegment.container);
         shape = this.shape;
+        moving = this.moving;
         clearing = this.clearing;
         prevPoint = trackSegment.curve.start;
         var props = {
             percent: 1 
         };
 
+
         var settings = {
             repeat: Infinity,
             yoyo: false,
             easing: 'Linear.None',
             onUpdate: function() {
-                var prevPoint = new game.Vector(this.position.x, this.position.y);
-                trackSegment.curve.point(this.percent, this.position);
-                shape.rotation = prevPoint.angle(this.position) + Math.PI/2;
+                if(moving) {
+                    var prevPoint = new game.Vector(this.position.x, this.position.y);
+                    trackSegment.curve.point(this.percent, this.position);
+                    shape.rotation = prevPoint.angle(this.position) + Math.PI/2;   
+                }
             },
             onRepeat: function() {
                 if(trackSegment.nextSegment){
@@ -132,9 +160,9 @@ game.createClass('Pilot', {
             }
         };
 
-        var tween = game.Tween.add(this.shape, props, this.speed, settings);
-        tween.start();
-    }
+        this.tween = game.Tween.add(this.shape, props, this.speed, settings);
+        this.tween.start();
+    },
 });
 
 
