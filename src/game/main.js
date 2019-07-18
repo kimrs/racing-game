@@ -18,11 +18,11 @@ game.createScene('Main', {
         track = new game.TrackSegment(bgContainer);
         track.addSegment();
         pilot = new game.Pilot(track);
+        car = new game.Car(pilot);
         pilot.shape.swap(track.nextSegment.shape);
         
-        camera = new game.GameCamera(container, pilot);
+        camera = new game.GameCamera(container, car.shape.parent);
     }
-    
 });
 
 game.createClass('GameCamera', {
@@ -30,12 +30,10 @@ game.createClass('GameCamera', {
     cameraSpeed: 400,
     toggleFollow: true,
     shape: null,
-    pilot:null,
-    container: null,
+    target:null,
     camera: null,
-    init: function(container, pilot) {
-        this.pilot = pilot;
-        this.container = container;
+    init: function(container, target) {
+        this.target = target;
         var offset = this.radius/2;
         this.shape = new game.Graphics();
         this.shape.lineWidth = 2;
@@ -50,15 +48,14 @@ game.createClass('GameCamera', {
         this.shape.addTo(container);
 
         this.camera = new game.Camera(this.shape);
-        
         this.camera.addTo(container);
     },
     
     update: function() {
         if (game.keyboard.down('SPACE')) this.toggleFollow = !this.toggleFollow; 
         
-        if(this.toggleFollow && this.pilot) {
-            this.shape.position.set(pilot.shape.x + this.radius, pilot.shape.y + this.radius);
+        if(this.toggleFollow && this.target) {
+            this.shape.position.set(this.target.x + this.radius, this.target.y + this.radius);
             return;
         }
 
@@ -69,6 +66,21 @@ game.createClass('GameCamera', {
 
     },
 });
+
+game.createClass('Car', {
+    size: 30,
+    shape: null,
+    pilot: null,
+    init: function(pilot) {
+        this.pilot = pilot;
+        this.shape = new game.Graphics();
+        this.shape.fillColor = 'gray';
+        this.shape.alpha = 0.5;
+        this.shape.drawPolygon([-this.size, this.size*2, -this.size, this.size, 0, 0, this.size, this.size, this.size, this.size*2, -this.size, this.size*2]);
+        pilot.shape.addChild(this.shape);
+    },
+});
+
 game.createClass('Pilot', {
     speed: 2000,
     shape: null,
@@ -81,9 +93,7 @@ game.createClass('Pilot', {
         this.shape = new game.Graphics();
         this.shape.fillColor = 'green';
         this.shape.drawPolygon([-this.size, this.size, 0, 0, this.size, this.size, -this.size, this.size]);
-        this.shape.addTo(game.scene.stage);
         this.shape.addTo(trackSegment.container);
-        
         shape = this.shape;
         clearing = this.clearing;
         prevPoint = trackSegment.curve.start;
