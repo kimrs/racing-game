@@ -32,12 +32,14 @@ game.createScene('Main', {
     update: function() {
         if(game.keyboard.down('W')) {
             this.pilot.tween.pause();
-            this.pilot.settings.moving = false;
         }
         if(game.keyboard.down('S')) {
             this.pilot.tween.resume();
-            this.pilot.settings.moving = true;
         }
+        if(game.keyboard.down('UP')) {
+            
+        }
+        
     }
 });
 
@@ -96,7 +98,7 @@ game.createClass('Pilot', {
     speed: 2000,
     shape: null,
     tween: null,
-    size: 20,
+    size: 10,
     clearing: 30,
     settings: null,
     
@@ -106,7 +108,8 @@ game.createClass('Pilot', {
         this.shape = new game.Graphics();
         this.shape.fillColor = 'green';
 
-        this.shape.drawRect(0, 0, 2*this.size, 4*this.size);
+        this.shape.drawCircle(this.size, this.size, this.size,  this.size);
+        //this.shape.anchorCenter();
         this.shape.addTo(trackSegment.container);
         shape = this.shape;
         clearing = this.clearing;
