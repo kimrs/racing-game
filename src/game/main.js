@@ -9,6 +9,8 @@ game.createScene('Main', {
     track: null,
     camera: null,
     radius: 40,
+    trackPos: new game.Vector(0,0),
+    
     init: function() {
         var bg = new game.Graphics();
         bg.drawRect(0, 0, game.width, game.height);
@@ -35,7 +37,17 @@ game.createScene('Main', {
         this.camera.addTo(bgContainer);
         this.camera.setTarget(this.pilot.shape);
     },
+    
     update: function() {
+        if(game.keyboard.down('SPACE')) {
+            var hyp = Math.pow(this.pilot.currentSegment.curve.end.x - this.car.shape.x, 2) 
+                    + Math.pow(this.pilot.currentSegment.curve.end.y - this.car.shape.y, 2);
+            hyp = Math.sqrt(hyp);
+            var percent = hyp / this.track.length;
+            
+            this.pilot.moveToPercentage(1 - percent);
+            //this.pilot.tween.resume();
+        }
         if(game.keyboard.down('W')) {
             this.pilot.tween.pause();
         }
@@ -55,17 +67,32 @@ game.createScene('Main', {
 });
 
 game.Debug.updatePanel = function() {
-    var pilot = game.scene.pilot.shape;
-    if (!pilot) return;
-    this.text  = ' pil: ' + pilot.x.toFixed(2) + ', ' + pilot.y.toFixed(2);
-    
+
+    var track = game.scene.pilot.currentSegment.curve.end;
+    //var track = game.scene.pilot.currentSegment;
+    if(!track) return;
+    this.text = ' trc: ' + track.x.toFixed(2) + ', ' + track.y.toFixed(2);
+    /*
     var camera = game.scene.camera;
     if(!camera) return;
     this.text += ' cam: ' + camera.position.x.toFixed(2) + ', ' + camera.position.y.toFixed(2);
-    
+    */
     var car = game.scene.car.shape;
     if(!car) return;
     this.text += ' car: ' + car.x.toFixed(2) + ', ' + car.y.toFixed(2);
+    var hyp = Math.pow(track.x - car.x, 2) + Math.pow(track.y - car.y, 2);
+    hyp = Math.sqrt(hyp);
+    hyp = hyp/800;
+    hyp = 1 - hyp;
+    this.text += ': ' + hyp.toFixed(2);
+    
+      
+    var pilot = game.scene.pilot.currentSegment.curve;
+    if (!pilot.shape) return;
+    this.text += ' pil: ' + pilot.tween.props;
+    //this.text  = ' pil: ' + pilot.shape.x.toFixed(2)s + ', ' + pilot.shape.y.toFixed(2);
+    
+    
 };
 
 game.createClass('Car', {
@@ -96,7 +123,6 @@ game.createClass('Car', {
 
 });
 
-
 game.createClass('Pilot', {
     speed: 2000,
     shape: null,
@@ -104,10 +130,15 @@ game.createClass('Pilot', {
     size: 10,
     clearing: 30,
     settings: null,
+    current: null,
+    container: null,
+    currentSegment: null,
     
-    init: function(trackSegment, container) {
-        tail = trackSegment;
-        head = trackSegment;
+    init: function(trackSegment, container, onEnterNextSegment) {
+        this.tail = trackSegment;
+        this.head = trackSegment;
+        this.currentSegment = trackSegment;
+        
         this.shape = new game.Graphics();
         this.shape.fillColor = 'green';
 
@@ -119,13 +150,62 @@ game.createClass('Pilot', {
         clearing = this.clearing;
         prevPoint = trackSegment.curve.start;
 
-        this.tween = this.genCurveTween(trackSegment, shape, container);
+        this.container = container;
+        //this.tween = this.genCurveTween(trackSegment, shape, container, this.enteredNextSegment(this));
+        this.tween = this.genCurveTween(trackSegment, shape, container, 
+            this.enteredNextSegment(this), this.doOnRepeat(trackSegment, container, shape, this.enteredNextSegment(this)));
         this.tween.start();
-        this.tween.pause();
+        //this.tween.pause();
         tween = this.tween;
     },
     
-    genCurveTween: function(trackSegment, shape, container) {
+    moveToPercentage: function(percentage) {
+        this.currentSegment.curve.point(percentage, this.shape.position);
+        if(percentage >= 0.90) {
+            this.currentSegment = this.currentSegment.nextSegment;
+            this.container.swap(currentSegment.shape);
+        }
+    },
+    
+    enteredNextSegment: function(thisPilot) {
+        return function(nextSegment) {
+            thisPilot.currentSegment = nextSegment;
+        };
+    },
+    
+    getCurrentSegmentPos: function() {
+        return this.currentSegment;  
+    },
+    
+    doOnRepeat: function(currentSegment, container, shape, onEnterNextSegment) {
+        head = currentSegment;
+        tail = currentSegment;
+        clearing = 30;
+        
+        return function() {
+            if(currentSegment.nextSegment){
+                currentSegment = currentSegment.nextSegment;
+                container.swap(currentSegment.shape);
+                onEnterNextSegment(currentSegment);
+            }
+            
+            while(head.nextSegment)                    
+                head = head.nextSegment;
+
+            while(shape.position.distance(tail.curve.end) > this.clearing*tail.length) {
+                var disposed = tail;
+                tail = tail.nextSegment;
+                disposed.remove();
+            }
+            
+            while(shape.position.distance(head.curve.end) < this.clearing*head.length) {
+                head.addSegment();
+                head = head.nextSegment;
+            }
+        };
+    },
+    
+    genCurveTween: function(trackSegment, shape, container, onEnterNextSegment, doOnRepeat) {
         var props = {
             percent: 1 
         };
@@ -143,11 +223,13 @@ game.createClass('Pilot', {
             trackSegment.curve.point(this.percent, this.position);
             shape.rotation = prevPoint.angle(this.position) + Math.PI/2;
         });
-        
+        //tween.onRepeat(doOnRepeat);
+
         tween.onRepeat(function() {
             if(trackSegment.nextSegment){
                 trackSegment = trackSegment.nextSegment;
                 container.swap(trackSegment.shape);
+                onEnterNextSegment(trackSegment);
             }
             
             while(head.nextSegment)                    
@@ -164,6 +246,7 @@ game.createClass('Pilot', {
                 head = head.nextSegment;
             }
         });
+        
         
         return tween;
     }
