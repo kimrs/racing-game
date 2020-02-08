@@ -22,12 +22,14 @@ game.createScene('Main', {
         this.track = new game.TrackSegment(bgContainer);
         this.track.addSegment();
         
-        //TODO: Add car container for pilot and car.
+        var spriteContainer = new game.Container();
+        spriteContainer.addTo(this.track.container);
+        spriteContainer.swap(this.track.nextSegment.shape);
         
-        this.pilot = new game.Pilot(this.track);
+        this.pilot = new game.Pilot(this.track, spriteContainer);
         this.pilot.shape.swap(this.track.nextSegment.shape);
         
-        this.car = new game.Car(this.pilot);
+        this.car = new game.Car(spriteContainer);
 
         this.camera = new game.Camera();
         this.camera.addTo(bgContainer);
@@ -71,13 +73,12 @@ game.createClass('Car', {
     speed: 300,
     shape: null,
     
-    init: function(pilot) {
+    init: function(container) {
         this.shape = new game.Graphics();
         this.shape.fillColor = 'gray';
         this.shape.alpha = 0.5;
         this.shape.drawRect(0, 0, this.size, 2*this.size);
-        
-        pilot.shape.addChild(this.shape);
+        container.addChild(this.shape);
     },
     
     forward: function() {
@@ -104,24 +105,27 @@ game.createClass('Pilot', {
     clearing: 30,
     settings: null,
     
-    init: function(trackSegment) {
+    init: function(trackSegment, container) {
         tail = trackSegment;
         head = trackSegment;
         this.shape = new game.Graphics();
         this.shape.fillColor = 'green';
 
         this.shape.drawCircle(this.size, this.size, this.size,  this.size);
-        this.shape.addTo(trackSegment.container);
+        this.shape.drawCircle(this.size, -this.size/2, this.size/2,  this.size/2);
+        this.shape.addTo(container);
+        
         shape = this.shape;
         clearing = this.clearing;
         prevPoint = trackSegment.curve.start;
 
-        this.tween = this.genCurveTween(trackSegment, shape);
+        this.tween = this.genCurveTween(trackSegment, shape, container);
         this.tween.start();
+        this.tween.pause();
         tween = this.tween;
     },
     
-    genCurveTween: function(trackSegment, shape) {
+    genCurveTween: function(trackSegment, shape, container) {
         var props = {
             percent: 1 
         };
@@ -143,18 +147,18 @@ game.createClass('Pilot', {
         tween.onRepeat(function() {
             if(trackSegment.nextSegment){
                 trackSegment = trackSegment.nextSegment;
-                shape.swap(trackSegment.shape);
+                container.swap(trackSegment.shape);
             }
+            
+            while(head.nextSegment)                    
+                head = head.nextSegment;
 
             while(shape.position.distance(tail.curve.end) > clearing*tail.length) {
                 var disposed = tail;
                 tail = tail.nextSegment;
                 disposed.remove();
             }
-                
-            while(head.nextSegment)                    
-                head = head.nextSegment;
-                
+            
             while(shape.position.distance(head.curve.end) < clearing*head.length) {
                 head.addSegment();
                 head = head.nextSegment;
