@@ -22,8 +22,12 @@ game.createScene('Main', {
         this.track = new game.TrackSegment(bgContainer);
         this.track.addSegment();
         
+        //TODO: Add car container for pilot and car.
+        
         this.pilot = new game.Pilot(this.track);
         this.pilot.shape.swap(this.track.nextSegment.shape);
+        
+        this.car = new game.Car(this.pilot);
 
         this.camera = new game.Camera();
         this.camera.addTo(bgContainer);
@@ -37,62 +41,60 @@ game.createScene('Main', {
             this.pilot.tween.resume();
         }
         if(game.keyboard.down('UP')) {
-            
+            this.car.forward();
         }
-        
+        if(game.keyboard.down('LEFT')) {
+            this.car.turnLeft();
+        }
+        if(game.keyboard.down('RIGHT')) {
+            this.car.turnRight();
+        }
     }
 });
 
 game.Debug.updatePanel = function() {
-
     var pilot = game.scene.pilot.shape;
     if (!pilot) return;
     this.text  = ' pil: ' + pilot.x.toFixed(2) + ', ' + pilot.y.toFixed(2);
     
-    
     var camera = game.scene.camera;
     if(!camera) return;
     this.text += ' cam: ' + camera.position.x.toFixed(2) + ', ' + camera.position.y.toFixed(2);
-    this.text += ' sen: ' + camera.sensorPosition.x.toFixed(2) + ', ' + camera.sensorPosition.y.toFixed(2);
+    
+    var car = game.scene.car.shape;
+    if(!car) return;
+    this.text += ' car: ' + car.x.toFixed(2) + ', ' + car.y.toFixed(2);
 };
 
-
-game.createClass('GameCamera', {
-    radius: 40,
-    cameraSpeed: 400,
+game.createClass('Car', {
+    size: 30,
+    speed: 300,
     shape: null,
-    target:null,
-    camera: null,
-    init: function(container, target) {
-        this.target = target;
-        var offset = this.radius/2;
-        
+    
+    init: function(pilot) {
         this.shape = new game.Graphics();
-        this.shape.lineWidth = 2;
-        this.shape.lineColor = 'red';
-        this.shape.fillColor = null;
-        this.shape.drawCircle(0, 0, this.radius);
-        this.shape.drawLine(-this.radius -offset, 0,  -offset , 0);
-        this.shape.drawLine(offset + this.radius, 0, offset , 0);
-        this.shape.drawLine(0, -this.radius -offset, 0, -offset);
-        this.shape.drawLine(0, this.radius +offset, 0, offset);
-        this.shape.anchorCenter();
+        this.shape.fillColor = 'gray';
+        this.shape.alpha = 0.5;
+        this.shape.drawRect(0, 0, this.size, 2*this.size);
         
-        this.camera = new game.Camera(this.shape);
+        pilot.shape.addChild(this.shape);
+    },
+    
+    forward: function() {
+        hyp = 10;
+        angle = this.shape.rotation;
+        this.shape.position.x =  hyp * Math.sin(angle) + this.shape.x;
+        this.shape.position.y = -hyp * Math.cos(angle) + this.shape.y;
+    },
+    turnLeft: function() {
+        this.shape.rotation -= Math.PI * game.delta;
+    },
+    turnRight: function() {
+        this.shape.rotation += Math.PI * game.delta;
     },
 
-    update: function() {
-        if(!this.target)
-            return;
-      
-        hyp = this.target.y;
-        angle = this.target.parent.rotation;
-        pos = new game.Vector(  -hyp * Math.sin(angle) + this.target.parent.x,
-                                 hyp * Math.cos(angle) + this.target.parent.y);
-        this.shape.position.set(pos.x + this.radius, pos.y + this.radius);
-        return;
-    },
 });
+
 
 game.createClass('Pilot', {
     speed: 2000,
@@ -109,7 +111,6 @@ game.createClass('Pilot', {
         this.shape.fillColor = 'green';
 
         this.shape.drawCircle(this.size, this.size, this.size,  this.size);
-        //this.shape.anchorCenter();
         this.shape.addTo(trackSegment.container);
         shape = this.shape;
         clearing = this.clearing;
