@@ -21,15 +21,15 @@ game.createScene('Main', {
         
         var bgContainer = new game.Container();
         bgContainer.addTo(container);
-        this.track = new game.TrackSegment(bgContainer);
-        this.track.addSegment();
+        this.track = new game.TrackSegmentQueue(bgContainer);
+        //this.track.addSegment();
         
         var spriteContainer = new game.Container();
-        spriteContainer.addTo(this.track.container);
-        spriteContainer.swap(this.track.nextSegment.shape);
+        spriteContainer.addTo(bgContainer);
+        spriteContainer.swap(this.track.peakNext().shape);
         
         this.pilot = new game.Pilot(this.track, spriteContainer);
-        this.pilot.shape.swap(this.track.nextSegment.shape);
+        //this.pilot.shape.swap(this.track.nextSegment.shape);
         
         this.car = new game.Car(spriteContainer);
 
@@ -68,7 +68,7 @@ game.createScene('Main', {
 
 game.Debug.updatePanel = function() {
 
-    var track = game.scene.pilot.currentSegment.curve.end;
+    var track = game.scene.track.currentSegment.curve.end;
     //var track = game.scene.pilot.currentSegment;
     if(!track) return;
     this.text = ' trc: ' + track.x.toFixed(2) + ', ' + track.y.toFixed(2);
@@ -87,7 +87,7 @@ game.Debug.updatePanel = function() {
     this.text += ': ' + hyp.toFixed(2);
     
       
-    var pilot = game.scene.pilot.currentSegment.curve;
+    var pilot = game.scene.track.currentSegment.curve;
     if (!pilot.shape) return;
     this.text += ' pil: ' + pilot.tween.props;
     //this.text  = ' pil: ' + pilot.shape.x.toFixed(2)s + ', ' + pilot.shape.y.toFixed(2);
@@ -134,26 +134,21 @@ game.createClass('Pilot', {
     container: null,
     currentSegment: null,
     
-    init: function(trackSegment, container, onEnterNextSegment) {
-        this.tail = trackSegment;
-        this.head = trackSegment;
-        this.currentSegment = trackSegment;
-        
+    init: function(trackQueue, container, onEnterNextSegment) {
         this.shape = new game.Graphics();
         this.shape.fillColor = 'green';
-
         this.shape.drawCircle(this.size, this.size, this.size,  this.size);
         this.shape.drawCircle(this.size, -this.size/2, this.size/2,  this.size/2);
         this.shape.addTo(container);
         
         shape = this.shape;
         clearing = this.clearing;
-        prevPoint = trackSegment.curve.start;
+        prevPoint = trackQueue.currentSegment.curve.start;
 
         this.container = container;
         //this.tween = this.genCurveTween(trackSegment, shape, container, this.enteredNextSegment(this));
-        this.tween = this.genCurveTween(trackSegment, shape, container, 
-            this.enteredNextSegment(this), this.doOnRepeat(trackSegment, container, shape, this.enteredNextSegment(this)));
+        this.tween = this.genCurveTween(trackQueue, shape, container, 
+            this.enteredNextSegment(this), this.doOnRepeat(trackQueue, container, shape, this.enteredNextSegment(this)));
         this.tween.start();
         //this.tween.pause();
         tween = this.tween;
@@ -177,35 +172,30 @@ game.createClass('Pilot', {
         return this.currentSegment;  
     },
     
-    doOnRepeat: function(currentSegment, container, shape, onEnterNextSegment) {
-        head = currentSegment;
-        tail = currentSegment;
-        clearing = 30;
+    doOnRepeat: function(trackQueue, container, shape, onEnterNextSegment) {
+
         
         return function() {
-            if(currentSegment.nextSegment){
-                currentSegment = currentSegment.nextSegment;
-                container.swap(currentSegment.shape);
-                onEnterNextSegment(currentSegment);
+            if(trackQueue.peakNext()){
+                trackQueue.moveToNext();
+                trackQueue.currentSegment.container.swap(currentSegment.shape);
+                onEnterNextSegment(trackQueue.currentSegment);
             }
             
-            while(head.nextSegment)                    
-                head = head.nextSegment;
+          //  while(head.nextSegment)                    
+        //        head = head.nextSegment;
 
             while(shape.position.distance(tail.curve.end) > this.clearing*tail.length) {
-                var disposed = tail;
-                tail = tail.nextSegment;
-                disposed.remove();
+                trackQueue.remove();
             }
             
             while(shape.position.distance(head.curve.end) < this.clearing*head.length) {
-                head.addSegment();
-                head = head.nextSegment;
+                trackQueue.add();
             }
         };
     },
     
-    genCurveTween: function(trackSegment, shape, container, onEnterNextSegment, doOnRepeat) {
+    genCurveTween: function(trackQueue, shape, container, onEnterNextSegment, doOnRepeat) {
         var props = {
             percent: 1 
         };
@@ -220,36 +210,70 @@ game.createClass('Pilot', {
         
         tween.onUpdate(function() {
             var prevPoint = new game.Vector(this.position.x, this.position.y);
-            trackSegment.curve.point(this.percent, this.position);
+            trackQueue.currentSegment.curve.point(this.percent, this.position);
             shape.rotation = prevPoint.angle(this.position) + Math.PI/2;
         });
         //tween.onRepeat(doOnRepeat);
 
         tween.onRepeat(function() {
-            if(trackSegment.nextSegment){
-                trackSegment = trackSegment.nextSegment;
-                container.swap(trackSegment.shape);
-                onEnterNextSegment(trackSegment);
+            if(trackQueue.peakNext()){
+                //trackSegment = trackSegment.nextSegment;
+                trackQueue.moveToNext();
+                container.swap(trackQueue.currentSegment.shape);
+                onEnterNextSegment(trackQueue.currentSegment);
             }
             
-            while(head.nextSegment)                    
-                head = head.nextSegment;
+            //while(head.nextSegment)                    
+            //    head = head.nextSegment;
 
-            while(shape.position.distance(tail.curve.end) > clearing*tail.length) {
-                var disposed = tail;
-                tail = tail.nextSegment;
-                disposed.remove();
+            while(shape.position.distance(trackQueue.tail.curve.end) > clearing*trackQueue.tail.length) {
+                //var disposed = tail;
+                //tail = tail.nextSegment;
+                //disposed.remove();
+                trackQueue.remove();
             }
             
-            while(shape.position.distance(head.curve.end) < clearing*head.length) {
-                head.addSegment();
-                head = head.nextSegment;
+            while(shape.position.distance(trackQueue.head.curve.end) < clearing*trackQueue.head.length) {
+                trackQueue.add();
             }
+            
         });
         
         
         return tween;
     }
+});
+
+game.createClass('TrackSegmentQueue', {
+     currentSegment: null,
+     tail: null,
+     head: null,
+     
+     init: function(container) {
+        this.currentSegment = new game.TrackSegment(container);
+        this.currentSegment.addSegment();
+        this.tail = this.currentSegment;
+        this.head = this.currentSegment.nextSegment;
+     },
+     
+     peakNext: function() {
+         return this.currentSegment.nextSegment;
+     },
+     
+     moveToNext: function() {
+         this.currentSegment = this.currentSegment.nextSegment;
+     },
+     
+     add: function() {
+         this.head.nextSegment = new game.TrackSegment(this.container, this.head);
+         this.head = this.head.nextSegment;
+     },
+     
+     remove: function() {
+         var disposed = this.tail;
+         this.tail = this.tail.nextSegment;
+         disposed.remove();
+     },
 });
 
 game.createClass('TrackSegment', {
@@ -289,13 +313,7 @@ game.createClass('TrackSegment', {
         while(segment.nextSegment) segment = segment.nextSegment;
         segment.nextSegment = new game.TrackSegment(this.container, segment);
     },
-    
-    addTo: function(container) {
-        this.container = container;
-        this.shape.addTo(container);
-        this.sprite.addTo(container);   
-    },
-    
+
     startCurve: function() {
         length = this.length;
         var tail = new game.Vector(game.width / 2, game.height / 2);
