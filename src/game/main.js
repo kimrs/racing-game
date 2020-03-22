@@ -1,6 +1,9 @@
 game.module(
     'game.main'
 )
+.require(
+    'plugin.p2'    
+)
 .body(function() {
 
 game.createScene('Main', {
@@ -12,7 +15,23 @@ game.createScene('Main', {
     trackPos: new game.Vector(0,0),
     
     init: function() {
-        this.world = new game.Physics(0, 0);
+        this.world = new game.Physics();
+        
+        shape = new p2.Circle(0.2);
+
+        body = new game.Body({mass:0.1});
+        body.position[0] = 50 / game.scene.world.ratio;
+        body.position[1] = 50 / game.scene.world.ratio;
+        
+        body.addShape(shape);
+        body.addTo(this.world);
+        
+        shape = new p2.Circle(0.2);
+        
+        body = new p2.Body({mass:1, position:[0,0]});
+        body.addShape(shape);
+
+        this.world.addBody(body);
         
         var bg = new game.Graphics();
         bg.drawRect(0, 0, game.width, game.height);
@@ -74,6 +93,7 @@ game.Debug.updatePanel = function() {
     if(!camera) return;
     this.text += ' cam: ' + camera.position.x.toFixed(2) + ', ' + camera.position.y.toFixed(2);
     */
+    /*
     var car = game.scene.car.shape;
     if(!car) return;
     this.text += ' car: ' + car.x.toFixed(2) + ', ' + car.y.toFixed(2);
@@ -82,11 +102,13 @@ game.Debug.updatePanel = function() {
     hyp = hyp/800;
     hyp = 1 - hyp;
     this.text += ': ' + hyp.toFixed(2);
-      
+    */
     var pilot = game.scene.track.currentSegment.curve;
     if (!pilot.shape) return;
     this.text += ' pil: ' + pilot.tween.props;
     //this.text  = ' pil: ' + pilot.shape.x.toFixed(2)s + ', ' + pilot.shape.y.toFixed(2);
+
+    
 };
 
 game.createClass('Car', {
@@ -96,25 +118,27 @@ game.createClass('Car', {
     
     init: function(container) {
         this.sprite = new game.Sprite('media/car.png');
-        this.sprite.anchor.set(24, 26);
-        this.sprite.fillColor = 'gray';
-        this.sprite.alpha = 0.5;
+        this.sprite.alpha = 0.8;
+        //this.sprite.anchor.set(24, 26);
+        
         container.addChild(this.sprite);
         
-        this.shape = new game.Circle(this.sprite.width / 2);
+        this.shape = new p2.Circle(0.2);
         
-        this.body = new game.Body();
+        this.body = new game.Body({
+            mass:1, position:[0,0]
+        });
         this.body.addShape(this.shape);
-        this.body.addTo(game.scene.world);
-        
-        
-        
+
+        this.body.applyForce([0, 100]);
+        //game.scene.world.addBody(this.body);
+        //game.scene.world.addBody(this.body);
     },
     
     forward: function() {
         hyp = 10;
         angle = this.shape.rotation;
-        this.body.force = new game.Vector(0, -10);
+        //this.body.force = new game.Vector(0, -10);
         //this.body.position.x =  hyp * Math.sin(angle) + this.shape.x;
         //this.body.position.y = -hyp * Math.cos(angle) + this.shape.y;
     },
