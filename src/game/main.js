@@ -12,6 +12,8 @@ game.createScene('Main', {
     trackPos: new game.Vector(0,0),
     
     init: function() {
+        this.world = new game.Physics(0, 0);
+        
         var bg = new game.Graphics();
         bg.drawRect(0, 0, game.width, game.height);
         bg.addTo(this.stage);
@@ -66,7 +68,7 @@ game.Debug.updatePanel = function() {
     var track = game.scene.track.currentSegment.curve.end;
     //var track = game.scene.pilot.currentSegment;
     if(!track) return;
-    this.text = ' trc: ' + track.x.toFixed(2) + ', ' + track.y.toFixed(2);
+    this.text += ' trc: ' + track.x.toFixed(2) + ', ' + track.y.toFixed(2);
     /*
     var camera = game.scene.camera;
     if(!camera) return;
@@ -80,7 +82,6 @@ game.Debug.updatePanel = function() {
     hyp = hyp/800;
     hyp = 1 - hyp;
     this.text += ': ' + hyp.toFixed(2);
-    
       
     var pilot = game.scene.track.currentSegment.curve;
     if (!pilot.shape) return;
@@ -91,27 +92,37 @@ game.Debug.updatePanel = function() {
 game.createClass('Car', {
     size: 30,
     speed: 300,
-    shape: null,
+    sprite: null,
     
     init: function(container) {
-        this.shape = new game.Sprite('media/car.png');
-        this.shape.anchor.set(25, 25);
-        this.shape.fillColor = 'gray';
-        this.shape.alpha = 0.5;
-        container.addChild(this.shape);
+        this.sprite = new game.Sprite('media/car.png');
+        this.sprite.anchor.set(24, 26);
+        this.sprite.fillColor = 'gray';
+        this.sprite.alpha = 0.5;
+        container.addChild(this.sprite);
+        
+        this.shape = new game.Circle(this.sprite.width / 2);
+        
+        this.body = new game.Body();
+        this.body.addShape(this.shape);
+        this.body.addTo(game.scene.world);
+        
+        
+        
     },
     
     forward: function() {
         hyp = 10;
         angle = this.shape.rotation;
-        this.shape.position.x =  hyp * Math.sin(angle) + this.shape.x;
-        this.shape.position.y = -hyp * Math.cos(angle) + this.shape.y;
+        this.body.force = new game.Vector(0, -10);
+        //this.body.position.x =  hyp * Math.sin(angle) + this.shape.x;
+        //this.body.position.y = -hyp * Math.cos(angle) + this.shape.y;
     },
     turnLeft: function() {
-        this.shape.rotation -= Math.PI * game.delta;
+        this.body.rotation -= Math.PI * game.delta;
     },
     turnRight: function() {
-        this.shape.rotation += Math.PI * game.delta;
+        this.body.rotation += Math.PI * game.delta;
     },
 
 });
