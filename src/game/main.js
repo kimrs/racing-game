@@ -86,8 +86,6 @@ game.Debug.updatePanel = function() {
     if (!pilot.shape) return;
     this.text += ' pil: ' + pilot.tween.props;
     //this.text  = ' pil: ' + pilot.shape.x.toFixed(2)s + ', ' + pilot.shape.y.toFixed(2);
-    
-    
 };
 
 game.createClass('Car', {
@@ -96,10 +94,10 @@ game.createClass('Car', {
     shape: null,
     
     init: function(container) {
-        this.shape = new game.Graphics();
+        this.shape = new game.Sprite('media/car.png');
+        this.shape.anchor.set(25, 25);
         this.shape.fillColor = 'gray';
         this.shape.alpha = 0.5;
-        this.shape.drawRect(0, 0, this.size, 2*this.size);
         container.addChild(this.shape);
     },
     
@@ -137,7 +135,7 @@ game.createClass('Pilot', {
 
         this.tween = this.genCurveTween(trackQueue, this.shape, container);
         this.tween.start();
-        //this.tween.pause();
+        this.tween.pause();
     },
     
     
