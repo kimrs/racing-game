@@ -16,23 +16,7 @@ game.createScene('Main', {
     
     init: function() {
         this.world = new game.Physics();
-        
-        shape = new p2.Circle(0.2);
 
-        body = new game.Body({mass:0.1});
-        body.position[0] = 50 / game.scene.world.ratio;
-        body.position[1] = 50 / game.scene.world.ratio;
-        
-        body.addShape(shape);
-        body.addTo(this.world);
-        
-        shape = new p2.Circle(0.2);
-        
-        body = new p2.Body({mass:1, position:[0,0]});
-        body.addShape(shape);
-
-        this.world.addBody(body);
-        
         var bg = new game.Graphics();
         bg.drawRect(0, 0, game.width, game.height);
         bg.addTo(this.stage);
@@ -56,6 +40,8 @@ game.createScene('Main', {
     },
     
     update: function() {
+        this.world.step(1/60);
+        
         if(game.keyboard.down('SPACE')) {
             var hyp = Math.pow(this.track.currentSegment.curve.end.x - this.car.shape.x, 2) 
                     + Math.pow(this.track.currentSegment.curve.end.y - this.car.shape.y, 2);
@@ -78,7 +64,7 @@ game.createScene('Main', {
         }
         if(game.keyboard.down('RIGHT')) {
             this.car.turnRight();
-        }
+        } 
     }
 });
 
@@ -124,14 +110,12 @@ game.createClass('Car', {
         container.addChild(this.sprite);
         
         this.shape = new p2.Circle(0.2);
+        container.addChild(this.shape);
         
-        this.body = new game.Body({
-            mass:1, position:[0,0]
-        });
+        this.body = new game.Body({mass:1});
         this.body.addShape(this.shape);
-
         this.body.applyForce([0, 100]);
-        //game.scene.world.addBody(this.body);
+        game.scene.world.addBody(this.body);
         //game.scene.world.addBody(this.body);
     },
     
