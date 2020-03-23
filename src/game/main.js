@@ -128,14 +128,10 @@ game.createClass('Car', {
     },
     
     forward: function() {
-        hyp = 100;
+        hyp = 1000;
         angle = this.body.angle;
-        this.body.force =   [  50
-                            ,  50];
+        this.body.force =   [  hyp * Math.sin(angle) ,  hyp * -Math.cos(angle)];
         
-        //this.body.force = new game.Vector(0, -10);
-        //this.body.position.x =  hyp * Math.sin(angle) + this.shape.x;
-        //this.body.position.y = -hyp * Math.cos(angle) + this.shape.y;
     },
     turnLeft: function() {
         this.body.angle -= Math.PI * game.delta;
