@@ -34,9 +34,12 @@ game.createScene('Main', {
         
         this.pilot = new game.Pilot(this.track, spriteContainer);
         this.car = new game.Car(spriteContainer);
+        this.car.follows = this.pilot.genGetPosition();
+
         this.camera = new game.Camera();
         this.camera.addTo(bgContainer);
-        this.camera.setTarget(this.pilot.shape);
+        //this.camera.setTarget(this.pilot.shape);
+        this.camera.setTarget(this.car.sprite);
     },
     
     update: function() {
@@ -57,6 +60,7 @@ game.createScene('Main', {
             this.pilot.tween.resume();
         }
         if(game.keyboard.down('UP')) {
+            this.pilot.stop();
             this.car.forward();
         }
         if(game.keyboard.down('LEFT')) {
@@ -102,6 +106,7 @@ game.createClass('Car', {
     size: 30,
     speed: 300,
     sprite: null,
+    follows: null,
     
     init: function(container) {
         this.sprite = new game.Sprite('media/car.png');
@@ -118,20 +123,25 @@ game.createClass('Car', {
         this.body.addShape(this.shape);
         this.body.applyForce([0, 100]);
         game.scene.world.addBody(this.body);
-        //game.scene.world.addBody(this.body);
     },
     
     update: function() {
+        if(this.follows)
+        {
+            var followCoords = this.follows();
+            this.body.position[0] = followCoords[0] / this.body.world.ratio;
+            this.body.position[1] = followCoords[1] / this.body.world.ratio;
+            this.body.angle = followCoords[2];
+        }
         this.sprite.x = this.body.position[0] * this.body.world.ratio;
         this.sprite.y = this.body.position[1] * this.body.world.ratio;
         this.sprite.rotation = this.body.angle;
     },
     
     forward: function() {
+        this.follows = null;
         hyp = 1000;
-        angle = this.body.angle;
-        this.body.force =   [  hyp * Math.sin(angle) ,  hyp * -Math.cos(angle)];
-        
+        this.body.force =   [  hyp * Math.sin(this.body.angle) ,  hyp * -Math.cos(this.body.angle)];
     },
     turnLeft: function() {
         this.body.angle -= Math.PI * game.delta;
@@ -148,23 +158,47 @@ game.createClass('Pilot', {
     clearing: 30,
     shape: null,
     
-    init: function(trackQueue, container, onEnterNextSegment) {
+    init: function(trackQueue, container) {
         this.shape = new game.Graphics();
         this.shape.fillColor = 'green';
-        this.shape.drawCircle(this.size, this.size, this.size,  this.size);
-        this.shape.drawCircle(this.size, -this.size/2, this.size/2,  this.size/2);
+        this.shape.drawCircle(0, 0, this.size,  this.size);
+        this.shape.drawCircle(0, -this.size, this.size/2,);
+        this.shape.fillColor = 'black';
+        this.shape.alpha = 0.2;
+        var multiplier = 8;
+        this.shape.drawCircle(0, 0, 10*this.size);
         this.shape.addTo(container);
         
         this.moveToPercentage = this.genMoveToPercentage(trackQueue, container);
         this.onRepeat = this.genOnRepeat(trackQueue, container, this.shape);
         this.onUpdate = this.genOnUpdate(trackQueue, this.shape);
+        this.stop = this.genStop(trackQueue);
 
         this.tween = this.genCurveTween(trackQueue, this.shape, container);
         this.tween.start();
-        this.tween.pause();
+        //this.tween.pause();
     },
-    
-    
+
+    genStop: function(trackQueue)
+    {
+        return function()
+        {
+            if(this.tween.playing) {
+                this.tween.stop();
+                this.onRepeat();
+                trackQueue.currentSegment.curve.point(0.5, this.shape.position);
+            }
+        }
+    },
+
+    genGetPosition()
+    {
+        var shape = this.shape;
+        return function() {
+            return [shape.position.x, shape.position.y, shape.rotation];
+        }
+    },
+
     genMoveToPercentage: function(trackQueue, container)
     {
         return function(percentage) {
@@ -201,17 +235,10 @@ game.createClass('Pilot', {
             shape.rotation = prevPoint.angle(this.position) + Math.PI/2;
         }
     },
-    /*
-    enteredNextSegment: function(thisPilot) {
-        return function(nextSegment) {
-            thisPilot.currentSegment = nextSegment;
-        };
-    },
-    */
+
     getCurrentSegmentPos: function() {
         return this.currentSegment;  
     },
-    
     
     genCurveTween: function(trackQueue, shape, container) {
         var props = {
