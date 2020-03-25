@@ -33,6 +33,12 @@ game.createScene('Main', {
         spriteContainer.swap(this.track.peakNext().shape);
         
         this.pilot = new game.Pilot(this.track, spriteContainer);
+        var genOnContact = function(pilot) {
+            return function(event) {
+                pilot.toNext();
+            }
+        }
+        this.world.on("beginContact", genOnContact(this.pilot));
         this.car = new game.Car(spriteContainer);
         this.car.follows = this.pilot.genGetPosition();
 
@@ -121,7 +127,6 @@ game.createClass('Car', {
         
         this.body = new game.Body({mass:1000});
         this.body.addShape(this.shape);
-        this.body.applyForce([0, 100]);
         game.scene.world.addBody(this.body);
     },
     
@@ -165,29 +170,45 @@ game.createClass('Pilot', {
         this.shape.drawCircle(0, -this.size, this.size/2,);
         this.shape.fillColor = 'black';
         this.shape.alpha = 0.2;
-        var multiplier = 8;
         this.shape.drawCircle(0, 0, 10*this.size);
         this.shape.addTo(container);
         
+        this.body = new p2.Body({mass: 0});
+        this.body.type = p2.Body.STATIC;
+        this.body.collisionResponse = false;
+        this.body.damping = 0;
+        var sensorShape = new p2.Circle({radius: 10*this.size / game.scene.world.ratio});
+        this.body.addShape(sensorShape);
+        game.scene.world.addBody(this.body);
+
         this.moveToPercentage = this.genMoveToPercentage(trackQueue, container);
         this.onRepeat = this.genOnRepeat(trackQueue, container, this.shape);
         this.onUpdate = this.genOnUpdate(trackQueue, this.shape);
-        this.stop = this.genStop(trackQueue);
+        this.toNext = this.genToNext(trackQueue);
 
         this.tween = this.genCurveTween(trackQueue, this.shape, container);
         this.tween.start();
         //this.tween.pause();
     },
+    update: function() {
+        this.body.position[0] = this.shape.x / this.body.world.ratio;
+        this.body.position[1] = this.shape.y / this.body.world.ratio;
+    },
 
-    genStop: function(trackQueue)
+    stop: function()
+    {
+        if(this.tween.playing) {
+            this.tween.stop();
+            this.toNext();
+        }
+    },
+
+    genToNext: function(trackQueue)
     {
         return function()
         {
-            if(this.tween.playing) {
-                this.tween.stop();
-                this.onRepeat();
-                trackQueue.currentSegment.curve.point(0.5, this.shape.position);
-            }
+            this.onRepeat();
+            trackQueue.currentSegment.curve.point(0.0, this.shape.position);
         }
     },
 
@@ -325,7 +346,6 @@ game.createClass('TrackSegment', {
         var tail = new game.Vector(game.width / 2, game.height / 2);
         var head = tail.clone();
         head.move(length, -Math.PI / 2);
-        var controlHandle = tail.clone();
        
         return new game.Curve(tail.x, tail.y, head.x, head.y, tail.x, tail.y, tail.x, tail.y);
     },
