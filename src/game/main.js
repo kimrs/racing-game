@@ -34,17 +34,17 @@ game.createScene('Main', {
         
         this.pilot = new game.Pilot(this.track, spriteContainer);
         var genOnContact = function(pilot) {
-            return function(event) {
-                pilot.toNext();
+            return function() {
+                if(!pilot.tween.playing)
+                    pilot.toNext();
             }
         }
         this.world.on("beginContact", genOnContact(this.pilot));
         this.car = new game.Car(spriteContainer);
-        this.car.follows = this.pilot.genGetPosition();
+        this.car.follows = this.pilot.genGetFollowing();
 
         this.camera = new game.Camera();
         this.camera.addTo(bgContainer);
-        //this.camera.setTarget(this.pilot.shape);
         this.camera.setTarget(this.car.sprite);
     },
     
@@ -52,12 +52,8 @@ game.createScene('Main', {
         this.world.step(1/60);
         
         if(game.keyboard.down('SPACE')) {
-            var hyp = Math.pow(this.track.currentSegment.curve.end.x - this.car.shape.x, 2) 
-                    + Math.pow(this.track.currentSegment.curve.end.y - this.car.shape.y, 2);
-            hyp = Math.sqrt(hyp);
-            var percent = hyp / 800;
-            
-            this.pilot.moveToPercentage(1 - percent);
+            if(!this.car.follows)
+                this.car.follows = this.pilot.genGetFollowing();
         }
         if(game.keyboard.down('W')) {
             this.pilot.tween.pause();
@@ -177,18 +173,13 @@ game.createClass('Pilot', {
         this.body.type = p2.Body.STATIC;
         this.body.collisionResponse = false;
         this.body.damping = 0;
-        var sensorShape = new p2.Circle({radius: 10*this.size / game.scene.world.ratio});
+        var sensorShape = new p2.Circle({radius: 10 * this.size / game.scene.world.ratio});
         this.body.addShape(sensorShape);
         game.scene.world.addBody(this.body);
 
-        this.moveToPercentage = this.genMoveToPercentage(trackQueue, container);
         this.onRepeat = this.genOnRepeat(trackQueue, container, this.shape);
         this.onUpdate = this.genOnUpdate(trackQueue, this.shape);
         this.toNext = this.genToNext(trackQueue);
-
-        this.tween = this.genCurveTween(trackQueue, this.shape, container);
-        this.tween.start();
-        //this.tween.pause();
     },
     update: function() {
         this.body.position[0] = this.shape.x / this.body.world.ratio;
@@ -212,25 +203,16 @@ game.createClass('Pilot', {
         }
     },
 
-    genGetPosition()
+    genGetFollowing()
     {
+        this.tween = this.genCurveTween();
+        this.tween.start();
         var shape = this.shape;
         return function() {
             return [shape.position.x, shape.position.y, shape.rotation];
         }
     },
 
-    genMoveToPercentage: function(trackQueue, container)
-    {
-        return function(percentage) {
-            trackQueue.currentSegment.curve.point(percentage, this.shape.position);
-            if(percentage >= 0.90) {
-                trackQueue.moveToNext();
-                container.swap(trackQueue.currentSegment.shape);
-            }
-        };
-    },
-    
     genOnRepeat: function(trackQueue, container, shape) {
         clearing = this.clearing;
         return function() {
@@ -261,7 +243,7 @@ game.createClass('Pilot', {
         return this.currentSegment;  
     },
     
-    genCurveTween: function(trackQueue, shape, container) {
+    genCurveTween: function() {
         var props = {
             percent: 1 
         };
@@ -273,6 +255,7 @@ game.createClass('Pilot', {
         };
         
         var tween = game.Tween.add(this.shape, props, this.speed, this.settings);
+        tween.object.percent = 0;
         
         tween.onUpdate(this.onUpdate);
         tween.onRepeat(this.onRepeat);
