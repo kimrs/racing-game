@@ -15,6 +15,8 @@ game.createScene('Main', {
     trackPos: new game.Vector(0,0),
     
     init: function() {
+        var curve = new Bezier(150,40 , 80,30 , 105,150);
+
         this.world = new game.Physics({gravity: [0, 0]});
 
         var bg = new game.Graphics();
@@ -42,6 +44,9 @@ game.createScene('Main', {
         this.world.on("beginContact", genOnContact(this.pilot));
         this.car = new game.Car(spriteContainer);
         this.car.follows = this.pilot.genGetFollowing();
+
+        this.tracker = new game.Tracker(this.track, spriteContainer);//Woot wooot, WOOOT?
+        this.tracker.follows = this.car.genGetFollowing();
 
         this.camera = new game.Camera();
         this.camera.addTo(bgContainer);
@@ -74,36 +79,6 @@ game.createScene('Main', {
     }
 });
 
-game.Debug.updatePanel = function() {
-
-    var track = game.scene.track.currentSegment.curve.end;
-    //var track = game.scene.pilot.currentSegment;
-    if(!track) return;
-    this.text += ' trc: ' + track.x.toFixed(2) + ', ' + track.y.toFixed(2);
-    /*
-    var camera = game.scene.camera;
-    if(!camera) return;
-    this.text += ' cam: ' + camera.position.x.toFixed(2) + ', ' + camera.position.y.toFixed(2);
-    */
-    
-    var car = game.scene.car.body;
-    if(!car) return;
-    this.text += ' car: ' + car.body[0].toFixed(2) + ', ' + car.body[1].toFixed(2);
-    /*
-    var hyp = Math.pow(track.x - car.x, 2) + Math.pow(track.y - car.y, 2);
-    hyp = Math.sqrt(hyp);
-    hyp = hyp/800;
-    hyp = 1 - hyp;
-    this.text += ': ' + hyp.toFixed(2);
-    */
-    var pilot = game.scene.track.currentSegment.curve;
-    if (!pilot.shape) return;
-    this.text += ' pil: ' + pilot.tween.props;
-    //this.text  = ' pil: ' + pilot.shape.x.toFixed(2)s + ', ' + pilot.shape.y.toFixed(2);
-
-    
-};
-
 game.createClass('Car', {
     size: 30,
     speed: 300,
@@ -113,16 +88,19 @@ game.createClass('Car', {
     init: function(container) {
         this.sprite = new game.Sprite('media/car.png');
         this.sprite.alpha = 0.8;
-        this.sprite.anchor.set(24, 26);
+        this.sprite.anchor.set(25, 25);
         
         container.addChild(this.sprite);
+       
+        this.shape = new game.Graphics();
+        this.shape.fillColor = 'green';
+        this.shape.drawCircle(0, 0, 20);
+        this.sprite.addChild(this.shape);
+        bodyShape = new p2.Circle({radius: 0.2});
+        bodyShape.angle = 2/Math.PI;
         
-        this.shape = new p2.Circle({radius: 0.2});
-        this.shape.angle = 2/Math.PI;
-        container.addChild(this.shape);
-        
-        this.body = new game.Body({mass:1000});
-        this.body.addShape(this.shape);
+        this.body = new p2.Body({mass:1000});
+        this.body.addShape(bodyShape);
         game.scene.world.addBody(this.body);
     },
     
@@ -138,7 +116,7 @@ game.createClass('Car', {
         this.sprite.y = this.body.position[1] * this.body.world.ratio;
         this.sprite.rotation = this.body.angle;
     },
-    
+
     forward: function() {
         this.follows = null;
         hyp = 1000;
@@ -151,47 +129,41 @@ game.createClass('Car', {
         this.body.angle += Math.PI * game.delta;
     },
 
+    genGetFollowing: function() {
+        var sprite = this.sprite;
+        return function() {
+            return [sprite.position.x, sprite.position.y, sprite.rotation];
+        }
+    }
+
 });
 
-game.createClass('Pilot', {
-    speed: 2000,
-    size: 10,
-    clearing: 30,
-    shape: null,
-    
+game.createClass('Tracker', {
+    follows: null,
+
     init: function(trackQueue, container) {
         this.shape = new game.Graphics();
-        this.shape.fillColor = 'green';
-        this.shape.drawCircle(0, 0, this.size,  this.size);
-        this.shape.drawCircle(0, -this.size, this.size/2,);
-        this.shape.fillColor = 'black';
-        this.shape.alpha = 0.2;
-        this.shape.drawCircle(0, 0, 10*this.size);
+        this.shape.fillColor = 'yellow';
+        this.shape.drawCircle(0, 0, 4);
         this.shape.addTo(container);
-        
-        this.body = new p2.Body({mass: 0});
-        this.body.type = p2.Body.STATIC;
-        this.body.collisionResponse = false;
-        this.body.damping = 0;
-        var sensorShape = new p2.Circle({radius: 10 * this.size / game.scene.world.ratio});
-        this.body.addShape(sensorShape);
-        game.scene.world.addBody(this.body);
-
-        this.onRepeat = this.genOnRepeat(trackQueue, container, this.shape);
-        this.onUpdate = this.genOnUpdate(trackQueue, this.shape);
-        this.toNext = this.genToNext(trackQueue);
-    },
-    update: function() {
-        this.body.position[0] = this.shape.x / this.body.world.ratio;
-        this.body.position[1] = this.shape.y / this.body.world.ratio;
+        this.update = this.genOnUpdate(trackQueue);
     },
 
-    stop: function()
-    {
-        if(this.tween.playing) {
-            this.tween.stop();
-            this.toNext();
+    genOnUpdate: function(trackQueue) {
+        return function() {
+            if(this.follows) {
+                var pos = this.follows();
+                trackQueue.currentSegment.curve.point(0.5, this.shape.position);
+            }
         }
+    }
+});
+
+game.createClass('Coach', {
+    init: function(trackQueue, container, shape) {
+        this.shape = shape;
+        this.onRepeat = this.genOnRepeat(trackQueue, container, this.shape);
+        this.toNext = this.genToNext(trackQueue);
     },
 
     genToNext: function(trackQueue)
@@ -203,8 +175,7 @@ game.createClass('Pilot', {
         }
     },
 
-    genGetFollowing()
-    {
+    genGetFollowing: function(){
         this.tween = this.genCurveTween();
         this.tween.start();
         var shape = this.shape;
@@ -230,7 +201,47 @@ game.createClass('Pilot', {
             }
         }
     },
+});
+
+game.createClass('Pilot', 'Coach', {
+    speed: 2000,
+    size: 10,
+    clearing: 30,
+    shape: null,
     
+    init: function(trackQueue, container) {
+
+        this.shape = new game.Graphics();
+        this.shape.fillColor = 'black';
+        this.shape.alpha = 0.2;
+        this.shape.drawCircle(0, 0, 10*this.size);
+        this.shape.addTo(container);
+
+        this.super(trackQueue, container, this.shape);
+        this.onUpdate = this.genOnUpdate(trackQueue, this.shape);
+        
+        this.body = new p2.Body({mass: 0});
+        this.body.type = p2.Body.STATIC;
+        this.body.collisionResponse = false;
+        this.body.damping = 0;
+        var sensorShape = new p2.Circle({radius: 10 * this.size / game.scene.world.ratio});
+        this.body.addShape(sensorShape);
+        game.scene.world.addBody(this.body);
+
+    },
+    update: function() {
+        this.body.position[0] = this.shape.x / this.body.world.ratio;
+        this.body.position[1] = this.shape.y / this.body.world.ratio;
+    },
+
+    stop: function()
+    {
+        if(this.tween.playing) {
+            this.tween.stop();
+            this.toNext();
+        }
+    },
+
     genOnUpdate: function(trackQueue, shape) {
         return function() {
             var prevPoint = new game.Vector(this.position.x, this.position.y);
@@ -239,10 +250,6 @@ game.createClass('Pilot', {
         }
     },
 
-    getCurrentSegmentPos: function() {
-        return this.currentSegment;  
-    },
-    
     genCurveTween: function() {
         var props = {
             percent: 1 
@@ -261,6 +268,15 @@ game.createClass('Pilot', {
         tween.onRepeat(this.onRepeat);
 
         return tween;
+    }
+});
+
+game.createClass('TrackBoundaries', {
+    init: function() {
+        this.dbgShape = new game.Graphics();
+        this.dbgShape.fillColor = 'yellow';
+        this.dbgShape.drawCircle(0, 0, 6);
+        this.dbgShape.addTo(this.container);
     }
 });
 
@@ -322,6 +338,7 @@ game.createClass('TrackSegment', {
         this.shape.lineColor = 'white';
         this.shape.drawCurve(this.curve);
         this.shape.addTo(this.container);
+
     },
 
     startCurve: function() {
