@@ -6,6 +6,7 @@ game.module(
 )
 .body(function() {
 
+var PILOT = 42;
 game.createScene('Main', {
     car: null,
     pilot: null,
@@ -34,8 +35,9 @@ game.createScene('Main', {
         
         this.pilot = new game.Pilot(this.track, spriteContainer);
         var genOnContact = function(pilot) {
-            return function() {
-                if(!pilot.tween.playing)
+            return function(event) {
+
+                if((event.bodyA.id == PILOT || event.bodyB.id == PILOT) && !pilot.tween.playing)
                     pilot.toNext();
             }
         }
@@ -140,18 +142,53 @@ game.createClass('Tracker', {
     follows: null,
 
     init: function(trackQueue, container) {
-        this.shape = new game.Graphics();
-        this.shape.fillColor = 'red';
-        this.shape.drawCircle(0, 0, 6);
-        this.shape.addTo(container);
         this.update = this.genOnUpdate(trackQueue);
+
+        var leftBox = new p2.Box({  width: 20 / game.scene.world.ratio, height: 300 / game.scene.world.ratio});
+        this.leftBody = new p2.Body();
+        this.leftBody.addShape(leftBox);
+        game.scene.world.addBody(this.leftBody);
+
+        var rightBox = new p2.Box({  width: 20 / game.scene.world.ratio, height: 300 / game.scene.world.ratio});
+        this.rightBody = new p2.Body();
+        this.rightBody.addShape(rightBox);
+        game.scene.world.addBody(this.rightBody);
+
+        var flattened = [];
+        rightBox.vertices.forEach(x => { flattened.push(x[0] * game.scene.world.ratio, x[1] * game.scene.world.ratio)});
+        this.rShape = new game.Graphics();
+        this.rShape.fillColor = 'red';
+        this.rShape.drawPolygon(flattened, false);
+        this.rShape.addTo(container);
+
+        var flattened = [];
+        leftBox.vertices.forEach(x => { flattened.push(x[0] * game.scene.world.ratio, x[1] * game.scene.world.ratio)});
+        this.lShape = new game.Graphics();
+        this.lShape.fillColor = 'red';
+        this.lShape.drawPolygon(flattened, false);
+        this.lShape.addTo(container);
     },
 
     genOnUpdate: function(trackQueue) {
         return function() {
             if(this.follows) {
-                this.shape.position = trackQueue.currentSegment.bCurve.project(this.follows());
+                var pnt = trackQueue.currentSegment.bCurve.project(this.follows());
+                var nv  = trackQueue.currentSegment.bCurve.normal(pnt.t);
+                var vec = new game.Vector(nv.x, nv.y);
+
+                this.rShape.rotation = vec.angle();
+                this.rShape.position = trackQueue.currentSegment.bCurve.offset(pnt.t, 100);
+
+                this.lShape.rotation = vec.angle();
+                this.lShape.position = trackQueue.currentSegment.bCurve.offset(pnt.t, -100);
             }
+            this.rightBody.position[0] = this.rShape.x / game.scene.world.ratio;
+            this.rightBody.position[1] = this.rShape.y / game.scene.world.ratio;
+            this.rightBody.angle = this.rShape.rotation;
+            
+            this.leftBody.position[0] = this.lShape.x / game.scene.world.ratio;
+            this.leftBody.position[1] = this.lShape.y / game.scene.world.ratio;
+            this.leftBody.angle = this.lShape.rotation;
         }
     }
 });
@@ -200,7 +237,6 @@ game.createClass('Coach', {
         }
     },
 });
-
 game.createClass('Pilot', 'Coach', {
     speed: 2000,
     size: 10,
@@ -224,6 +260,7 @@ game.createClass('Pilot', 'Coach', {
         this.body.type = p2.Body.STATIC;
         this.body.collisionResponse = false;
         this.body.damping = 0;
+        this.body.id = PILOT;
         var sensorShape = new p2.Circle({radius: 10 * this.size / game.scene.world.ratio});
         this.body.addShape(sensorShape);
         game.scene.world.addBody(this.body);
