@@ -6,6 +6,7 @@ game.module(
 )
 .body(function() {
 
+var DBG_GRAPHICS = false;
 var PILOT = 42;
 game.createScene('Main', {
     car: null,
@@ -17,6 +18,8 @@ game.createScene('Main', {
     
     init: function() {
         this.world = new game.Physics({gravity: [0, 0]});
+        this.world.defaultContactMaterial.friction = 0;
+        this.world.defaultContactMaterial.restitution = 2;
 
         var bg = new game.Graphics();
         bg.drawRect(0, 0, game.width, game.height);
@@ -44,18 +47,25 @@ game.createScene('Main', {
         this.world.on("beginContact", genOnContact(this.pilot));
         this.car = new game.Car(spriteContainer);
         this.car.follows = this.pilot.genGetFollowing();
+        this.crosshair = new game.Crosshair(this.track, spriteContainer);
+        this.crosshair.follows = this.car.genGetFollowing();
 
-        this.tracker = new game.Tracker(this.track, spriteContainer);//Woot wooot, WOOOT?
+        this.tracker = new game.Tracker(this.track, spriteContainer);
         this.tracker.follows = this.car.genGetFollowing();
 
         this.camera = new game.Camera();
         this.camera.addTo(bgContainer);
         this.camera.setTarget(this.car.sprite);
     },
+
+    mousedown: function(x, y) {
+        this.pilot.stop();
+        this.car.forward(this.crosshair.angle);
+    },
     
     update: function() {
         this.world.step(1/60);
-        
+
         if(game.keyboard.down('SPACE')) {
             if(!this.car.follows)
                 this.car.follows = this.pilot.genGetFollowing();
@@ -94,7 +104,8 @@ game.createClass('Car', {
        
         this.shape = new game.Graphics();
         this.shape.fillColor = 'green';
-        this.shape.drawCircle(0, 0, 20);
+        if(DBG_GRAPHICS)
+            this.shape.drawCircle(0, 0, 20);
         this.sprite.addChild(this.shape);
         bodyShape = new p2.Circle({radius: 0.2});
         bodyShape.angle = 2/Math.PI;
@@ -117,10 +128,14 @@ game.createClass('Car', {
         this.sprite.rotation = this.body.angle;
     },
 
-    forward: function() {
+    forward: function(angle) {
+        if(!angle) angle = this.body.angle;
         this.follows = null;
-        hyp = 1000;
-        this.body.force =   [  hyp * Math.sin(this.body.angle) ,  hyp * -Math.cos(this.body.angle)];
+        hyp = 2000;
+        this.body.velocity = [0.0, 0.0];
+        this.body.force = [0.0, 0.0];
+        this.body.applyImpulse([  hyp * Math.sin(angle) ,  hyp * -Math.cos(angle)])
+        this.body.angle = angle;
     },
     turnLeft: function() {
         this.body.angle -= Math.PI * game.delta;
@@ -135,7 +150,46 @@ game.createClass('Car', {
             return sprite.position;
         }
     }
+});
 
+game.createClass('Crosshair', {
+    follows: null,
+    angle: null,
+    direction: Math.PI/38,
+    view: 0,
+    maxRange:  Math.PI/2,
+    minRange: -Math.PI/2,
+
+    init: function(trackQueue, container) {
+        var shape = new game.Graphics();
+        shape.fillColor = 'orange';
+        shape.lineColor = 'yellow';
+        shape.drawLine(0, 0, 0, -50);
+        shape.drawCircle(0, -50, 6);
+        shape.addTo(container);
+
+        this.update = this.genOnUpdate(trackQueue, shape);
+    },
+
+    genOnUpdate: function(trackQueue, shape) {
+        return function() {
+            if(this.follows) {
+                var target = this.follows();
+                var pnt = trackQueue.currentSegment.bCurve.project(target);
+                var nv  = trackQueue.currentSegment.bCurve.normal(pnt.t);
+                var vec = new game.Vector(nv.x, nv.y);
+
+                this.view += this.direction;
+                if(this.view >= this.maxRange || this.view <= this.minRange)
+                    this.direction *= -1;
+
+                shape.rotation = vec.angle() + this.view;
+                shape.position = target;
+
+                this.angle = shape.rotation;
+            }
+        }
+    }
 });
 
 game.createClass('Tracker', {
@@ -158,14 +212,16 @@ game.createClass('Tracker', {
         rightBox.vertices.forEach(x => { flattened.push(x[0] * game.scene.world.ratio, x[1] * game.scene.world.ratio)});
         this.rShape = new game.Graphics();
         this.rShape.fillColor = 'red';
-        this.rShape.drawPolygon(flattened, false);
+        if(DBG_GRAPHICS)
+            this.rShape.drawPolygon(flattened, false);
         this.rShape.addTo(container);
 
         var flattened = [];
         leftBox.vertices.forEach(x => { flattened.push(x[0] * game.scene.world.ratio, x[1] * game.scene.world.ratio)});
         this.lShape = new game.Graphics();
         this.lShape.fillColor = 'red';
-        this.lShape.drawPolygon(flattened, false);
+        if(DBG_GRAPHICS)
+            this.lShape.drawPolygon(flattened, false);
         this.lShape.addTo(container);
     },
 
@@ -238,7 +294,7 @@ game.createClass('Coach', {
     },
 });
 game.createClass('Pilot', 'Coach', {
-    speed: 2000,
+    speed: 4000,
     size: 10,
     clearing: 30,
     shape: null,
@@ -248,7 +304,9 @@ game.createClass('Pilot', 'Coach', {
         this.shape = new game.Graphics();
         this.shape.fillColor = 'black';
         this.shape.alpha = 0.2;
-        this.shape.drawCircle(0, 0, 10*this.size);
+
+        if(DBG_GRAPHICS)
+            this.shape.drawCircle(0, 0, 10*this.size);
 
         this.shape.addTo(container);
 
