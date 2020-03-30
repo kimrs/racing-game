@@ -6,8 +6,11 @@ game.module(
 )
 .body(function() {
 
+
+
 var DBG_GRAPHICS = false;
 var PILOT = 42;
+game.addAsset('grass_texture_4.jpg')
 game.createScene('Main', {
     car: null,
     pilot: null,
@@ -15,20 +18,24 @@ game.createScene('Main', {
     camera: null,
     radius: 40,
     trackPos: new game.Vector(0,0),
+    mousepnt: new game.Vector(0,0),
     
     init: function() {
         this.world = new game.Physics({gravity: [0, 0]});
         this.world.defaultContactMaterial.friction = 0;
         this.world.defaultContactMaterial.restitution = 2;
 
-        var bg = new game.Graphics();
-        bg.drawRect(0, 0, game.width, game.height);
-        bg.addTo(this.stage);
-        
         var container = new game.Container();
         container.addTo(this.stage);
         
         var bgContainer = new game.Container();
+        var bg = new game.Background(bgContainer);
+       // bg.follows  = function(x) {
+       //     return function() {
+       //         return x;
+       //     }
+       // }(this.mousepnt);
+
         bgContainer.addTo(container);
         this.track = new game.TrackSegmentQueue(bgContainer);
         
@@ -39,54 +46,74 @@ game.createScene('Main', {
         this.pilot = new game.Pilot(this.track, spriteContainer);
         var genOnContact = function(pilot) {
             return function(event) {
-
                 if((event.bodyA.id == PILOT || event.bodyB.id == PILOT) && !pilot.tween.playing)
                     pilot.toNext();
             }
         }
+
         this.world.on("beginContact", genOnContact(this.pilot));
         this.car = new game.Car(spriteContainer);
         this.car.follows = this.pilot.genGetFollowing();
-        this.crosshair = new game.Crosshair(this.track, spriteContainer);
+        this.crosshair = new game.Crosshair(this.track, container);
         this.crosshair.follows = this.car.genGetFollowing();
 
         this.tracker = new game.Tracker(this.track, spriteContainer);
         this.tracker.follows = this.car.genGetFollowing();
+        this.follows = this.car.genGetFollowing();
+        bg.follows = this.car.genGetFollowing();
 
         this.camera = new game.Camera();
-        this.camera.addTo(bgContainer);
+        this.camera.addTo(container);
         this.camera.setTarget(this.car.sprite);
     },
 
     mousedown: function(x, y) {
         this.pilot.stop();
         this.car.forward(this.crosshair.angle);
+        this.mousepnt.x = x;
+        this.mousepnt.y = y;
+    },
+    keydown: function(key) {
+
+        if(key == 'SPACE') {
+            if(!this.car.follows)
+                this.car.follows = this.pilot.genGetFollowing();
+        }
     },
     
     update: function() {
         this.world.step(1/60);
-
-        if(game.keyboard.down('SPACE')) {
-            if(!this.car.follows)
-                this.car.follows = this.pilot.genGetFollowing();
-        }
-        if(game.keyboard.down('W')) {
-            this.pilot.tween.pause();
-        }
-        if(game.keyboard.down('S')) {
-            this.pilot.tween.resume();
-        }
-        if(game.keyboard.down('UP')) {
-            this.pilot.stop();
-            this.car.forward();
-        }
-        if(game.keyboard.down('LEFT')) {
-            this.car.turnLeft();
-        }
-        if(game.keyboard.down('RIGHT')) {
-            this.car.turnRight();
-        } 
     }
+});
+
+game.createClass('Background', {
+    width: 800,
+    height: 800,
+    follows: null,
+    init: function(container) {
+        this.tiles = new Array();
+        for(var x = 0; x < 3; x++)
+            for(var y = 0; y < 3; y++){
+                var tile = new game.TilingSprite('grass_texture_4.jpg', this.width, this.height);
+                tile.addTo(container);
+                tile.position = new game.Vector(this.width * x, this.height * y);
+                this.tiles.push(tile);
+            }
+    },
+    update: function() {
+        if(this.follows) {
+            var point = this.follows();
+            var middleTile = this.tiles[4];
+            var tx = 0, ty = 0;
+            if(point.x < middleTile.x)                  tx = -this.width;
+            if(point.x > middleTile.x + this.width)     tx = this.width
+            if(point.y < middleTile.y)                  ty = -this.height;
+            if(point.y > middleTile.y + this.height)    ty = this.height;
+
+            this.tiles.forEach(tile => {tile.x += tx; tile.y += ty});
+        }
+    }
+
 });
 
 game.createClass('Car', {
@@ -294,7 +321,7 @@ game.createClass('Coach', {
     },
 });
 game.createClass('Pilot', 'Coach', {
-    speed: 4000,
+    speed: 2000,
     size: 10,
     clearing: 30,
     shape: null,
@@ -419,7 +446,10 @@ game.createClass('TrackSegment', {
         } else {
             this.curve = this.continuingCurve(prevSegment);
         }
+        this.bCurve = this.toBezier(this.curve);
+
         this.shape = new game.Graphics();
+        //this.shape.alpha = 0.1;
         this.shape.lineWidth = this.width;
         this.shape.lineColor = 'blue';
         this.shape.drawCurve(this.curve);
@@ -427,9 +457,6 @@ game.createClass('TrackSegment', {
         this.shape.lineColor = 'white';
         this.shape.drawCurve(this.curve);
         this.shape.addTo(this.container);
-
-        this.bCurve = this.toBezier(this.curve);
-
     },
 
     toBezier: function(curve) {
