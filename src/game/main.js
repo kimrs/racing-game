@@ -10,7 +10,8 @@ game.module(
 
 var DBG_GRAPHICS = false;
 var PILOT = 42;
-game.addAsset('grass_texture_4.jpg')
+game.addAsset('grass.jpg');
+game.addAsset('asphalt.png');
 game.createScene('Main', {
     car: null,
     pilot: null,
@@ -30,11 +31,6 @@ game.createScene('Main', {
         
         var bgContainer = new game.Container();
         var bg = new game.Background(bgContainer);
-       // bg.follows  = function(x) {
-       //     return function() {
-       //         return x;
-       //     }
-       // }(this.mousepnt);
 
         bgContainer.addTo(container);
         this.track = new game.TrackSegmentQueue(bgContainer);
@@ -91,10 +87,12 @@ game.createClass('Background', {
     height: 800,
     follows: null,
     init: function(container) {
+
         this.tiles = new Array();
         for(var x = 0; x < 3; x++)
             for(var y = 0; y < 3; y++){
-                var tile = new game.TilingSprite('grass_texture_4.jpg', this.width, this.height);
+                var tile = new game.TilingSprite('grass.jpg', this.width, this.height);
+                tile.cache = true;
                 tile.addTo(container);
                 tile.position = new game.Vector(this.width * x, this.height * y);
                 this.tiles.push(tile);
@@ -104,11 +102,15 @@ game.createClass('Background', {
         if(this.follows) {
             var point = this.follows();
             var middleTile = this.tiles[4];
+            var dx = this.width;
+            var dy = this.height;
+            var sx = middleTile.x;
+            var sy = middleTile.y;
             var tx = 0, ty = 0;
-            if(point.x < middleTile.x)                  tx = -this.width;
-            if(point.x > middleTile.x + this.width)     tx = this.width
-            if(point.y < middleTile.y)                  ty = -this.height;
-            if(point.y > middleTile.y + this.height)    ty = this.height;
+            if(point.x < sx)                  tx = -dx;
+            if(point.x > sx + dx)     tx = dx
+            if(point.y < sy)                  ty = -dy;
+            if(point.y > sy + dy)    ty = dy;
 
             this.tiles.forEach(tile => {tile.x += tx; tile.y += ty});
         }
@@ -124,7 +126,7 @@ game.createClass('Car', {
     
     init: function(container) {
         this.sprite = new game.Sprite('media/car.png');
-        this.sprite.alpha = 0.8;
+        //this.sprite.alpha = 0.8;
         this.sprite.anchor.set(25, 25);
         
         container.addChild(this.sprite);
@@ -447,9 +449,9 @@ game.createClass('TrackSegment', {
             this.curve = this.continuingCurve(prevSegment);
         }
         this.bCurve = this.toBezier(this.curve);
-
+        
         this.shape = new game.Graphics();
-        //this.shape.alpha = 0.1;
+        this.shape.alpha = 0.2;
         this.shape.lineWidth = this.width;
         this.shape.lineColor = 'blue';
         this.shape.drawCurve(this.curve);
@@ -457,6 +459,40 @@ game.createClass('TrackSegment', {
         this.shape.lineColor = 'white';
         this.shape.drawCurve(this.curve);
         this.shape.addTo(this.container);
+        
+        var mask = new game.Graphics();
+        mask.fillColor = 'red';
+        var vertices = [];
+        var origin = this.bCurve.get(0);
+        origin = new game.Vector(origin.x, origin.y);
+        for(var t=0.0; t<=1; t+=0.1) {
+            var pt = this.bCurve.get(t);
+            pt = new game.Vector(pt.x, pt.y);
+            var nv = this.bCurve.normal(t);
+            vertices.push(pt.x + 100*nv.x);
+            vertices.push(pt.y + 100*nv.y);
+        }
+        
+        for(var t=1; t>= 0; t-=0.1) {
+            var pt = this.bCurve.get(t);
+            var nv = this.bCurve.normal(t);
+            vertices.push(pt.x - 100*nv.x);
+            vertices.push(pt.y - 100*nv.y);
+        }
+        vertices.push(vertices[0]);
+        vertices.push(vertices[1]);
+
+
+        mask.drawPolygon(vertices, true);
+        mask.addTo(this.shape);
+        var tile = new game.TilingSprite('asphalt.png', 800, 800);
+        tile.anchor.set(400, -400);
+        tile.position = this.curve.end;
+        tile.addTo(this.shape);
+        //tile.mask = mask; 
+        //this.shape = tile;
+
+        
     },
 
     toBezier: function(curve) {
