@@ -1,0 +1,3 @@
+[submodule "src/bezierjs"]
+	path = src/bezierjs
+	url = https://github.com/Pomax/bezierjs.git
